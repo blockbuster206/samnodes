@@ -1,4 +1,4 @@
-from samnodes.udpclient import Client, message
+from samnodes.udpclient import UDPClient, message
 from authentication import Authentication
 
 
@@ -77,12 +77,29 @@ class commands:
                 client.send_message(client_text_addr, distributor_addr)
                 client.send_message(distributor_text_addr, addr)
 
+    @staticmethod
+    def relay(parameter, arguments, addr):
+        if parameter == "distributor":
+            arguments = arguments.split()
+            distributor_id = arguments[0]
+            msg = " ".join(arguments[1:])
+            client.send_message(msg, distributors[distributor_id]["public"])
+
+        if parameter == "user":
+            arguments = arguments.split()
+            user = arguments[0]
+            msg = " ".join(arguments[1:])
+            client.send_message(msg, users[user].get("public"))
+
+
+
 
 command_table = {
     "distributor": commands.distributor,
     "user": commands.user,
     "remove": commands.remove,
-    "request": commands.request
+    "request": commands.request,
+    "relay": commands.relay
 }
 
 
@@ -97,7 +114,7 @@ localIP = ""
 localPort = 20001
 
 authentication = Authentication()
-client = Client()
+client = UDPClient()
 
 client.socket.bind((localIP, localPort))
 

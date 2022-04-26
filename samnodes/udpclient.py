@@ -27,7 +27,7 @@ class message:
                + data
 
 
-class Client:
+class UDPClient:
     def __init__(self):
         self.socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 

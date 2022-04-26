@@ -1,6 +1,8 @@
 import socket
+import threading
+import time
 
-from samnodes.udpclient import Client, message
+from samnodes.udpclient import UDPClient, message
 import logging
 import sys
 
@@ -21,15 +23,21 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 handler.setFormatter(formatter)
 root.addHandler(handler)
 
-print("<sam-nodes Copyright (C) 2022 blockbuster206>")
+startup_msg = " ____                  _   _           _           \n" \
+              "/ ___|  __ _ _ __ ___ | \ | | ___   __| | ___  ___ \n" \
+              "\___ \ / _` | '_ ` _ \|  \| |/ _ \ / _` |/ _ \/ __|\n" \
+              " ___) | (_| | | | | | | |\  | (_) | (_| |  __/\__ \\\n" \
+              "|____/ \__,_|_| |_| |_|_| \_|\___/ \__,_|\___||___/\n" \
+              "   <sam-nodes Copyright (C) 2022 blockbuster206>   \n"
+print(startup_msg)
 
 
 class Distributor:
     def __init__(self):
-        self.client = Client()
+        self.client = UDPClient()
         self.id = None
 
-    def connect_distributor(self, distributor_token):
+    def connect(self, distributor_token):
         self.client.send_data(
             message.create_command_message("distributor", "authentication",
                                            distributor_token).encode("utf-8"), (localIP, localPort))
@@ -74,11 +82,48 @@ class Distributor:
         self.client.send_message("hello", addr)
         print("message sent UDP HOLPUNCHING BLLODYU WORKKEJS")
 
+    def establish_connection_client(self, addr):
+        global loop
+        root.info("attempting to connect to client")
+        loop = True
+
+        def receive_confirm_msg():
+            msg1, addr1 = self.client.receive_message()
+            if not msg1 == "msg_received":
+                receive_confirm_msg()
+            else:
+                root.info("client has received my message")
+
+        def receive_msg():
+            global loop
+            msg1, addr1 = self.client.receive_message()
+            if msg1 == "msg_received":
+                root.info("client has received message")
+                msg1, addr1 = distributor.client.receive_message()
+                root.info(f"message received from the client: {msg1}")
+                distributor.client.send_message(
+                    message.create_command_message("relay", "user", "anon msg_received"), server_addr)
+            else:
+                root.info(f"message received from the client: {msg1}")
+                distributor.client.send_message(
+                    message.create_command_message("relay", "user", "anon msg_received"), server_addr)
+                receive_confirm_msg()
+            loop = False
+
+        threading.Thread(target=receive_msg, daemon=True).start()
+
+        while loop:
+            distributor.client.send_message("among us", addr)
+            time.sleep(1)  # Try to send the udp hole punching packets every 1 second
+
+        root.info("connected successfully with client")
+
+
 
 def connect():
     global _token
     # _token = input("token: ")
-    if not distributor.connect_distributor(_token):
+    if not distributor.connect(_token):
         connect()
 
 
@@ -97,7 +142,6 @@ distributor = Distributor()
 _token = "hello"
 connect()
 
-
 msg, addr = distributor.client.receive_message()
 
 msg = message.convert_command_message(msg.encode("utf-8"))
@@ -105,16 +149,17 @@ if msg["command"] == "request":
     arguments = msg["arguments"]
     distributor.client.send_message("available", (localIP, localPort))
 
-
 msg, addr = distributor.client.receive_message()
 
 target_addr = msg.split()
 target_addr = (target_addr[0], int(target_addr[1]))
-print(target_addr)
+root.info(f"received the client's public endpoint: {target_addr}")
 
-distributor.client.send_message("test", target_addr)
-msg, addr1 = distributor.client.receive_message()
-print(msg)
+loop = True
+
+distributor.establish_connection_client(target_addr)
+
+distributor.client.send_message("Hi shiter", target_addr)
 
 # send message to each other
 
